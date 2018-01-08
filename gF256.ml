@@ -1,6 +1,10 @@
 (* See https://tools.ietf.org/html/draft-mcgrew-tss-03 *)
 type t = int
 
+let zero = 0
+
+let one = 1
+
 let of_char = int_of_char
 
 let to_char = char_of_int
