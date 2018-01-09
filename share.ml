@@ -24,22 +24,26 @@ let coefficients secret threshold =
       (fun i ->
          if i = 0
          then secret
-         else Cstruct.get_uint8 a (i-1)) in
+         else Cstruct.get_char a (i-1) |> GF256.of_char) in
   assert (Array.length a = threshold);
   a
 
-let share_byte secret threshold shares =
+let share_indices shares =
+  Array.init shares (fun i ->
+      GF256.of_char (char_of_int (succ i)))
+
+let share_byte ~shares ~threshold secret =
   assert (threshold <= shares);
   assert (threshold > 0);
-  let secret = int_of_char secret in
+  let secret = GF256.of_char secret in
   let a = coefficients secret threshold in
-  Array.init shares succ
+  share_indices shares
   |> Array.map (fun x -> x, f a x)
 
-let share secret threshold shares =
+let share ~shares ~threshold secret =
   assert (threshold <= shares);
   assert (threshold > 0);
-  let xs = Array.init shares succ in
+  let xs = share_indices shares in
   let as_ =
     Array.init (String.length secret)
       (fun i ->
