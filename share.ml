@@ -37,7 +37,7 @@ let share_byte secret threshold shares =
   Array.init shares succ
   |> Array.map (fun x -> x, f a x)
 
-let l i u =
+let l_ i u =
   Array.mapi 
     (fun j u_j ->
        let open GF256 in
@@ -48,15 +48,15 @@ let l i u =
     u
   |> product
 
-let i u v =
+let i_ u v =
   let open GF256.Infix in
   Array.mapi
     (fun i v_i ->
-       l i u * v_i)
+       l_ i u * v_i)
     v
   |> sum
 
 let unshare_byte shares =
   let u = Array.map fst shares
   and v = Array.map snd shares in
-  i u v |> GF256.to_char
+  i_ u v |> GF256.to_char
