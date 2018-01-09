@@ -9,6 +9,7 @@ let of_char = int_of_char
 
 let to_char = char_of_int
 
+(* Table taken from https://tools.ietf.org/html/draft-mcgrew-tss-03 *)
 let exp_table = [|
   0x01; 0x03; 0x05; 0x0f; 0x11; 0x33; 0x55; 0xff;
   0x1a; 0x2e; 0x72; 0x96; 0xa1; 0xf8; 0x13; 0x35;
@@ -44,6 +45,7 @@ let exp_table = [|
   0x1c; 0x24; 0x6c; 0xb4; 0xc7; 0x52; 0xf6; 0x00;
 |]
 
+(* Table taken from https://tools.ietf.org/html/draft-mcgrew-tss-03 *)
 let log_table = [|
     0;    0;   25;    1;   50;    2;   26;  198;
    75;  199;   27;  104;   51;  238;  223;    3;
