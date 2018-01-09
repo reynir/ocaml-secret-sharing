@@ -39,14 +39,16 @@ let share_byte secret threshold shares =
 let share secret threshold shares =
   assert (threshold <= shares);
   assert (threshold > 0);
-  Array.init shares succ
-  |> Array.map (fun x ->
+  let xs = Array.init shares succ in
+  let as_ =
+    Array.init (String.length secret)
+      (fun i ->
+         coefficients (GF256.of_char secret.[i]) threshold) in
+  Array.map (fun x ->
       x,
-      String.map
-        (fun s ->
-           let a = coefficients (GF256.of_char s) threshold in
-           GF256.to_char (f a x)))
-
+      String.init (String.length secret)
+        (fun i -> GF256.to_char (f as_.(i) x )))
+    xs
 
 let l_ i u =
   Array.mapi 
