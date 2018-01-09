@@ -18,34 +18,41 @@ let f (a : GF256.t array) (x : GF256.t) =
     else loop (i-1) a x (add a.(i) (mul x acc)) in
   loop (Array.length a - 1) a x GF256.zero
 
-
-let share_byte secret threshold shares =
-  assert (threshold <= shares);
-  assert (threshold > 0);
-  let secret = int_of_char secret in
+let coefficients secret threshold =
   let a = Nocrypto.Rng.generate (threshold - 1) in
   let a = Array.init threshold
       (fun i ->
          if i = 0
          then secret
          else Cstruct.get_uint8 a (i-1)) in
+  assert (Array.length a = threshold);
+  a
+
+
+let share_byte secret threshold shares =
+  assert (threshold <= shares);
+  assert (threshold > 0);
+  let secret = int_of_char secret in
+  let a = coefficients secret threshold in
   Array.init shares succ
   |> Array.map (fun x -> x, f a x)
 
-let l u i =
+let l i u =
   Array.mapi 
     (fun j u_j ->
        let open GF256 in
+       let open GF256.Infix in
        if i = j
        then one
-       else div u_j (add u_j u.(i)))
+       else u_j / (u_j + u.(i)))
     u
   |> product
 
 let i u v =
+  let open GF256.Infix in
   Array.mapi
     (fun i v_i ->
-       GF256.mul (l u i) v_i)
+       l i u * v_i)
     v
   |> sum
 

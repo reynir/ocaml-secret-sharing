@@ -87,7 +87,9 @@ let add x y =
 let sub = add
 
 let log x =
-  log_table.(x)
+  if x = 0
+  then raise (Invalid_argument "zero divisor")
+  else log_table.(x)
 
 let exp x =
   exp_table.(x)
