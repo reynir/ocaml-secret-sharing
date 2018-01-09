@@ -95,12 +95,14 @@ let exp x =
 let mul x y =
   match x, y with
   | 0, _ | _, 0 -> 0
-  | x, y -> exp ((log x + log y) mod 256)
+  | x, y -> exp ((log x + log y) mod 255)
 
 let div x y =
   if y = 0
   then raise (Invalid_argument "zero divisor")
-  else exp ((256 + log x - log y) mod 256)
+  else if x = 0
+  then 0
+  else exp ((255 + log x - log y) mod 255)
   
 
 module Infix = struct
