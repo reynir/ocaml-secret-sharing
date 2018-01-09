@@ -78,10 +78,10 @@ let unshare shares =
   let vs =
     Array.init (String.length v.(0))
       (fun i ->
-         Array.map (fun s -> s.[i]) v) in
+         Array.map (fun s -> GF256.of_char s.[i]) v) in
   String.init (Array.length vs)
     (fun i ->
        let zipped =
          Array.init (Array.length u)
-           (fun j -> u.(j), GF256.of_char vs.(i).(j)) in
+           (fun j -> u.(j), vs.(i).(j)) in
        unshare_byte zipped)
