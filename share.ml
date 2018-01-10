@@ -148,6 +148,7 @@ let coefficients secret threshold =
   a
 
 let share_byte secret threshold shares =
+  assert (shares <= 255);
   assert (threshold <= shares);
   assert (threshold > 0);
   let secret = int_of_char secret in
@@ -156,6 +157,7 @@ let share_byte secret threshold shares =
   |> Array.map (fun x -> x, f a x)
 
 let share secret threshold shares =
+  assert (shares <= 255);
   assert (threshold <= shares);
   assert (threshold > 0);
   let xs = Array.init shares succ in
