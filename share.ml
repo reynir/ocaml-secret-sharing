@@ -130,6 +130,7 @@ let product a =
     a
 
 let f (a : GF256.t array) (x : GF256.t) =
+  (* compute a.(0) + x * (a.(1) + x * (... + x * (a.(m)) ...)) *)
   let rec loop i a x acc =
     let open GF256 in
     if i = 0
@@ -137,6 +138,8 @@ let f (a : GF256.t array) (x : GF256.t) =
     else loop (i-1) a x (add a.(i) (mul x acc)) in
   loop (Array.length a - 1) a x GF256.zero
 
+(* Generate coefficients a.(0), ..., a.(m-1) such that a.(0) is [secret], and
+ * a.(1), ..., a.(m-1) are random. *)
 let coefficients secret threshold =
   let a = Nocrypto.Rng.generate (threshold - 1) in
   let a = Array.init threshold
@@ -153,57 +156,69 @@ let share_byte secret threshold shares =
   assert (threshold > 0);
   let secret = int_of_char secret in
   let a = coefficients secret threshold in
+  (* Use 1,..., n as indices *)
   Array.init shares succ
+  (* For each index compute the polynomial and return the point *)
   |> Array.map (fun x -> x, f a x)
 
 let share secret threshold shares =
   assert (shares <= 255);
   assert (threshold <= shares);
   assert (threshold > 0);
+  (* Use 1, ..., n as indices *)
   let xs = Array.init shares succ in
+  (* Generate coefficients for a polynomial for each character in the secret. *)
   let as_ =
     Array.init (String.length secret)
       (fun i ->
          coefficients (GF256.of_char secret.[i]) threshold) in
+  (* Compute the secrets for each index *)
   Array.map (fun x ->
       x,
       String.init (String.length secret)
         (fun i -> GF256.to_char (f as_.(i) x )))
     xs
 
-let l_ i u =
+let l i u =
+  let open GF256.Infix in
   Array.mapi 
     (fun j u_j ->
-       let open GF256 in
-       let open GF256.Infix in
        if i = j
-       then one
+       then GF256.one
        else u_j / (u_j + u.(i)))
     u
   |> product
 
-let i_ u v =
+let interpolate u v =
   let open GF256.Infix in
   Array.mapi
     (fun i v_i ->
-       l_ i u * v_i)
+       l i u * v_i)
     v
   |> sum
 
 let unshare_byte shares =
+  (* u is the indices *)
   let u = Array.map fst shares
+  (* v is the shares *)
   and v = Array.map snd shares in
-  i_ u v |> GF256.to_char
+  interpolate u v |> GF256.to_char
 
 let unshare shares =
+  (* u is the indices *)
   let u = Array.map fst shares
+  (* v is the share strings *)
   and v = Array.map snd shares in
+  (* Diagonalize the share string array so the resulting array consists of
+   * arrays that each consist of shares of the same character, i.e.
+   * vs.(j).(i) := v.(i).[j] for all i, j *)
   let vs =
     Array.init (String.length v.(0))
       (fun i ->
          Array.map (fun s -> GF256.of_char s.[i]) v) in
   String.init (Array.length vs)
     (fun i ->
+       (* Zip each one-byte share with its index *)
        let zipped =
          Array.init (Array.length u)
            (fun j -> u.(j), vs.(i).(j)) in
