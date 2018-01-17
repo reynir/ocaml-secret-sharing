@@ -1,2 +1,0 @@
-true: package(nocrypto), package(nocrypto.unix)
-true: debug
