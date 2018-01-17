@@ -27,7 +27,7 @@ end
 (** [share_byte secret threshold shares] splits a string [secret] into [shares]
  * shares where (at least) [threshold] shares are necessary to reconstruct
  * [secret]. *)
-val share : string -> int -> int -> (GF256.t * string) array
+val share : ?g:Nocrypto.Rng.g -> string -> int -> int -> (GF256.t * string) array
 
 (** [unshare shares] combines [shares] to reconstruct the secret. Note that
  * there's no integrity checks. It is up to the user to ensure that there are
@@ -36,7 +36,7 @@ val share : string -> int -> int -> (GF256.t * string) array
 val unshare : (GF256.t * string) array -> string
 
 (** Same as [share], but if you only want to share a one-byte secret *)
-val share_byte : char -> int -> int -> (GF256.t * GF256.t) array
+val share_byte : ?g:Nocrypto.Rng.g -> char -> int -> int -> (GF256.t * GF256.t) array
 
 (** Same as [unshare], but if you only want to reconstruct a one-byte secret *)
 val unshare_byte : (GF256.t * GF256.t) array -> char

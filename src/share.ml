@@ -140,8 +140,8 @@ let f (a : GF256.t array) (x : GF256.t) =
 
 (* Generate coefficients a.(0), ..., a.(m-1) such that a.(0) is [secret], and
  * a.(1), ..., a.(m-1) are random. *)
-let coefficients secret threshold =
-  let a = Nocrypto.Rng.generate (threshold - 1) in
+let coefficients ?g secret threshold =
+  let a = Nocrypto.Rng.generate ?g (threshold - 1) in
   let a = Array.init threshold
       (fun i ->
          if i = 0
@@ -150,18 +150,18 @@ let coefficients secret threshold =
   assert (Array.length a = threshold);
   a
 
-let share_byte secret threshold shares =
+let share_byte ?g secret threshold shares =
   assert (shares <= 255);
   assert (threshold <= shares);
   assert (threshold > 0);
   let secret = int_of_char secret in
-  let a = coefficients secret threshold in
   (* Use 1,..., n as indices *)
+  let a = coefficients ?g secret threshold in
   Array.init shares succ
   (* For each index compute the polynomial and return the point *)
   |> Array.map (fun x -> x, f a x)
 
-let share secret threshold shares =
+let share ?g secret threshold shares =
   assert (shares <= 255);
   assert (threshold <= shares);
   assert (threshold > 0);
@@ -171,8 +171,8 @@ let share secret threshold shares =
   let as_ =
     Array.init (String.length secret)
       (fun i ->
-         coefficients (GF256.of_char secret.[i]) threshold) in
   (* Compute the secrets for each index *)
+         coefficients ?g (GF256.of_char secret.[i]) threshold) in
   Array.map (fun x ->
       x,
       String.init (String.length secret)
