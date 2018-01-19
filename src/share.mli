@@ -1,5 +1,4 @@
-(** Implementation of GF(2^8) *)
-module GF256 : sig
+module type Field = sig
   type t
 
   val zero : t
@@ -16,13 +15,16 @@ module GF256 : sig
   val exp : t -> t
   val log : t -> t
 
-  module Infix : sig
+  module Infix: sig
     val ( + ) : t -> t -> t
     val ( - ) : t -> t -> t
     val ( * ) : t -> t -> t
     val ( / ) : t -> t -> t
   end
 end
+
+(** Implementation of GF(2^8) *)
+module GF256: Field
 
 (** [share_byte secret threshold shares] splits a string [secret] into [shares]
  * shares where (at least) [threshold] shares are necessary to reconstruct
@@ -40,4 +42,3 @@ val share_byte : ?g:Nocrypto.Rng.g -> char -> int -> int -> (GF256.t * GF256.t) 
 
 (** Same as [unshare], but if you only want to reconstruct a one-byte secret *)
 val unshare_byte : (GF256.t * GF256.t) array -> char
-

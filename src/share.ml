@@ -1,6 +1,83 @@
-(* See https://tools.ietf.org/html/draft-mcgrew-tss-03 *)
+module type Field = sig
+  type t
 
-module GF256 = struct
+  val zero : t
+  val one : t
+
+  val of_char : char -> t
+  val to_char : t -> char
+
+  val add : t -> t -> t
+  val sub : t -> t -> t
+  val mul : t -> t -> t
+  val div : t -> t -> t
+
+  val exp : t -> t
+  val log : t -> t
+
+  module Infix: sig
+    val ( + ) : t -> t -> t
+    val ( - ) : t -> t -> t
+    val ( * ) : t -> t -> t
+    val ( / ) : t -> t -> t
+  end
+end
+
+module Polynomial(F: Field) = struct
+  let sum a =
+    Array.fold_left
+      F.add
+      F.zero
+      a
+
+  let product a =
+    Array.fold_left
+      F.mul
+      F.one
+      a
+
+  let f (a : F.t array) (x : F.t) =
+    (* compute a.(0) + x * (a.(1) + x * (... + x * (a.(m)) ...)) *)
+    let rec loop i a x acc =
+      let open F in
+      if i = 0
+      then add a.(0) (mul x acc)
+      else loop (i-1) a x (add a.(i) (mul x acc)) in
+    loop (Array.length a - 1) a x F.zero
+
+  (* Generate coefficients a.(0), ..., a.(m-1) such that a.(0) is [secret], and
+   * a.(1), ..., a.(m-1) are random. *)
+  let coefficients ?g secret threshold =
+    let a = Nocrypto.Rng.generate ?g (threshold - 1) in
+    let a = Array.init threshold
+        (fun i ->
+           if i = 0
+           then secret
+           else Cstruct.get_uint8 a (i-1)) in
+    assert (Array.length a = threshold);
+    a
+
+  let l i u =
+    let open F.Infix in
+    Array.mapi
+      (fun j u_j ->
+         if i = j
+         then F.one
+         else u_j / (u_j + u.(i)))
+      u
+    |> product
+
+  let interpolate u v =
+    let open F.Infix in
+    Array.mapi
+      (fun i v_i ->
+         l i u * v_i)
+      v
+    |> sum
+end
+
+(* See https://tools.ietf.org/html/draft-mcgrew-tss-03 *)
+module GF256: Field with type t = int = struct
   type t = int
 
   let zero = 0
@@ -108,47 +185,15 @@ module GF256 = struct
     then 0
     else exp ((255 + log x - log y) mod 255)
 
-
   module Infix = struct
-    let ( + ) = add
-    let ( - ) = sub
-    let ( * ) = mul
-    let ( / ) = div
+    let ( + ) e = add e
+    let ( - ) e = sub e
+    let ( * ) e = mul e
+    let ( / ) e = div e
   end
 end
 
-let sum a =
-  Array.fold_left
-    GF256.add
-    GF256.zero
-    a
-
-let product a =
-  Array.fold_left
-    GF256.mul
-    GF256.one
-    a
-
-let f (a : GF256.t array) (x : GF256.t) =
-  (* compute a.(0) + x * (a.(1) + x * (... + x * (a.(m)) ...)) *)
-  let rec loop i a x acc =
-    let open GF256 in
-    if i = 0
-    then add a.(0) (mul x acc)
-    else loop (i-1) a x (add a.(i) (mul x acc)) in
-  loop (Array.length a - 1) a x GF256.zero
-
-(* Generate coefficients a.(0), ..., a.(m-1) such that a.(0) is [secret], and
- * a.(1), ..., a.(m-1) are random. *)
-let coefficients ?g secret threshold =
-  let a = Nocrypto.Rng.generate ?g (threshold - 1) in
-  let a = Array.init threshold
-      (fun i ->
-         if i = 0
-         then secret
-         else Cstruct.get_uint8 a (i-1)) in
-  assert (Array.length a = threshold);
-  a
+module Poly_GF256 = Polynomial(GF256)
 
 let share_byte ?g secret threshold shares =
   assert (shares <= 255);
@@ -156,10 +201,10 @@ let share_byte ?g secret threshold shares =
   assert (threshold > 0);
   let secret = int_of_char secret in
   (* Use 1,..., n as indices *)
-  let a = coefficients ?g secret threshold in
+  let a = Poly_GF256.coefficients ?g secret threshold in
   Array.init shares succ
   (* For each index compute the polynomial and return the point *)
-  |> Array.map (fun x -> x, f a x)
+  |> Array.map (fun x -> x, Poly_GF256.f a x)
 
 let share ?g secret threshold shares =
   assert (shares <= 255);
@@ -172,37 +217,19 @@ let share ?g secret threshold shares =
     Array.init (String.length secret)
       (fun i ->
   (* Compute the secrets for each index *)
-         coefficients ?g (GF256.of_char secret.[i]) threshold) in
+         Poly_GF256.coefficients ?g (GF256.of_char secret.[i]) threshold) in
   Array.map (fun x ->
       x,
       String.init (String.length secret)
-        (fun i -> GF256.to_char (f as_.(i) x )))
+        (fun i -> GF256.to_char (Poly_GF256.f as_.(i) x )))
     xs
-
-let l i u =
-  let open GF256.Infix in
-  Array.mapi 
-    (fun j u_j ->
-       if i = j
-       then GF256.one
-       else u_j / (u_j + u.(i)))
-    u
-  |> product
-
-let interpolate u v =
-  let open GF256.Infix in
-  Array.mapi
-    (fun i v_i ->
-       l i u * v_i)
-    v
-  |> sum
 
 let unshare_byte shares =
   (* u is the indices *)
   let u = Array.map fst shares
   (* v is the shares *)
   and v = Array.map snd shares in
-  interpolate u v |> GF256.to_char
+  Poly_GF256.interpolate u v |> GF256.to_char
 
 let unshare shares =
   (* u is the indices *)
