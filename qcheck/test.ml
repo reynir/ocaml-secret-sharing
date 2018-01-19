@@ -51,26 +51,28 @@ let gf256_suite = Share.GF256.[
        a * (b + c) = a * b + a * c);
 ]
 
-let rng = QCheck.(map 
-                    (fun seed ->
-                       let seed = Cstruct.of_string seed in
-                       Nocrypto.Rng.create ~seed (module Nocrypto.Rng.Generators.Fortuna))
-                    (string_of_size Gen.(return 16)))
+let seed = QCheck.(string_of_size Gen.(return 16))
+
+let g_of_seed seed =
+  Nocrypto.Rng.(create ~seed:(Cstruct.of_string seed) (module Generators.Fortuna))
 
 let share_suite = [
   QCheck.Test.make ~count:200 ~name:"share_3x5_unshare_all_identity"
-    QCheck.(pair rng string)
-    (fun (g, s) ->
+    QCheck.(pair seed string)
+    (fun (seed, s) ->
+       let g = g_of_seed seed in
        let shares = Share.share ~g s 3 5 in
        Share.unshare shares = s);
   QCheck.Test.make ~count:200 ~name:"share_3x5_unshare_first_3_identity"
-    QCheck.(pair rng string)
-    (fun (g, s) ->
+    QCheck.(pair seed string)
+    (fun (seed, s) ->
+       let g = g_of_seed seed in
        let shares = Share.share ~g s 3 5 in
        Share.unshare (Array.sub shares 0 3) = s);
   QCheck.Test.make ~count:200 ~name:"share_3x5_unshare_last_3_identity"
-    QCheck.(pair rng string)
-    (fun (g, s) ->
+    QCheck.(pair seed string)
+    (fun (seed, s) ->
+       let g = g_of_seed seed in
        let shares = Share.share ~g s 3 5 in
        Share.unshare (Array.sub shares 2 3) = s);
 ]
