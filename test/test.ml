@@ -26,6 +26,10 @@ let shares = [|
   1, "\xB9\xFA\x07\xE1\x85";
   2, "\xF5\x40\x9B\x45\x11";
 |] |> Array.map (fun (x, s) ->
-    Share.GF256.(of_char (char_of_int x), s))
+    Share.GF256.of_int x, s)
 let secret' = Share.unshare shares
 let () = Printf.printf "Secret %S, computed secret %S\n" secret secret'
+
+let shares' = Share.extend 2 shares
+let secret' = Share.unshare shares'
+let () = Printf.printf "Secret %S, re-computed secret %S\n" secret secret'

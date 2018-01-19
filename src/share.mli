@@ -46,19 +46,37 @@ val share : ?g:Nocrypto.Rng.g -> string -> int -> int -> (GF256.t * string) arra
  * otherwise modified. *)
 val unshare : (GF256.t * string) array -> string
 
+(** [extend k shares] generates k more shares from [shares]. The same caveats as
+ * [unshare] apply here too. *)
+val extend : ?g:Nocrypto.Rng.g -> int -> (GF256.t * string) array -> (GF256.t * string) array
+
 (** Same as [share], but if you only want to share a one-byte secret *)
 val share_byte : ?g:Nocrypto.Rng.g -> char -> int -> int -> (GF256.t * GF256.t) array
 
 (** Same as [unshare], but if you only want to reconstruct a one-byte secret *)
 val unshare_byte : (GF256.t * GF256.t) array -> char
 
+(** Same as [extend], but if you only want to extend a one-byte secret. *)
+val extend_byte : ?g:Nocrypto.Rng.g -> int -> (GF256.t * GF256.t) array -> (GF256.t * GF256.t) array
+
 (** Construct a SecretShare module over an arbitrary field. *)
 module SecretShare (F: Field) : sig
-  val share : F.t -> int -> int -> (int -> (F.t array, 's) rng) -> ((F.t * F.t) array, 's) rng
+  type shares = (F.t * F.t) array
+  type array_shares = (F.t * F.t array) array
 
-  val unshare : (F.t * F.t) array -> F.t
+  val share : F.t -> int -> int -> (int -> (F.t array, 's) rng) -> (shares, 's) rng
 
-  val share_array : F.t array -> int -> int -> (int -> (F.t array, 's) rng) -> ((F.t * F.t array) array, 's) rng
+  val unshare : shares -> F.t
 
-  val unshare_array : (F.t * F.t array) array -> F.t array
+  val extend : F.t array -> shares -> shares
+
+  val extend' : int -> shares -> (int -> (F.t array, 's) rng) -> (shares, 's) rng
+
+  val share_array : F.t array -> int -> int -> (int -> (F.t array, 's) rng) -> (array_shares, 's) rng
+
+  val unshare_array : array_shares -> F.t array
+
+  val extend_array : F.t array -> array_shares -> array_shares
+
+  val extend_array' : int -> array_shares -> (int -> (F.t array, 's) rng) -> (array_shares, 's) rng
 end

@@ -1,5 +1,6 @@
 let (%) f g x = f (g x)
 let second f (x, y) = (x, f y)
+let pair x y = x, y
 
 module type Field = sig
   type t
@@ -216,8 +217,16 @@ let array_s_init n f s =
     done;
     arr, !s'
 
+(* Transpose a 2-d matrix, assumed non-empty *)
+let array_transpose v =
+  Array.init (Array.length v.(0))
+    (fun i ->
+       Array.map (fun s -> s.(i)) v)
+
 module SecretShare (F: Field) = struct
   module Poly = Polynomial(F)
+  type shares = (F.t * F.t) array
+  type array_shares = (F.t * F.t array) array
 
   let share secret threshold shares rng s =
     assert (shares < F.size);
@@ -232,10 +241,20 @@ module SecretShare (F: Field) = struct
 
   let unshare shares =
     (* u is the indices *)
-    let u = Array.map fst shares
+    let u = Array.map fst shares in
     (* v is the shares *)
-    and v = Array.map snd shares in
+    let v = Array.map snd shares in
     Poly.interpolate u v F.zero
+
+  let extend xs shares =
+    let u = Array.map fst shares in
+    let v = Array.map snd shares in
+    let ys = Array.map (Poly.interpolate u v) xs in
+    Array.map2 pair xs ys
+
+  let extend' more shares rng s =
+    let xs, s = rng more s in
+    extend xs shares, s
 
   let share_array secret threshold shares rng s =
     assert (shares < F.size);
@@ -263,10 +282,7 @@ module SecretShare (F: Field) = struct
     (* Diagonalize the share string array so the resulting array consists of
      * arrays that each consist of shares of the same character, i.e.
      * vs.(j).(i) := v.(i).[j] for all i, j *)
-    let vs =
-      Array.init (Array.length v.(0))
-        (fun i ->
-           Array.map (fun s -> s.(i)) v) in
+    let vs = array_transpose v in
     Array.init (Array.length vs)
       (fun i ->
          (* Zip each one-byte share with its index *)
@@ -274,6 +290,24 @@ module SecretShare (F: Field) = struct
            Array.init (Array.length u)
              (fun j -> u.(j), vs.(i).(j)) in
          unshare zipped)
+
+  let extend_array xs shares =
+    let u = Array.map fst shares
+    and v = Array.map snd shares in
+    let vs = array_transpose v in
+    Array.init (Array.length vs)
+      (fun i ->
+         (* Zip each one-byte share with its index *)
+         let zipped =
+           Array.init (Array.length u)
+             (fun j -> u.(j), vs.(i).(j)) in
+         extend xs zipped |> Array.map snd)
+    |> array_transpose
+    |> Array.map2 pair xs
+
+  let extend_array' more shares rng s =
+    let xs, s = rng more s in
+    extend_array xs shares, s
 end
 
 module SecretShare_GF256 = SecretShare(GF256)
@@ -293,8 +327,18 @@ let unshare shares =
   |> Array.map (second GF256.of_string)
   |> SecretShare_GF256.unshare_array |> GF256.to_string
 
+let extend ?g more shares =
+  let shares' = Array.map (second GF256.of_string) shares in
+  SecretShare_GF256.extend_array' more shares'
+    (nocrypto_rng ?g) () |> fst
+  |> Array.map (second GF256.to_string)
+
 let share_byte ?g secret threshold shares =
   SecretShare_GF256.share (GF256.of_char secret) threshold shares
     (nocrypto_rng ?g) () |> fst
 
 let unshare_byte shares = SecretShare_GF256.unshare shares |> GF256.to_char
+
+let extend_byte ?g more shares =
+  SecretShare_GF256.extend' more shares
+    (nocrypto_rng ?g) () |> fst
