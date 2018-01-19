@@ -56,6 +56,16 @@ let seed = QCheck.(string_of_size Gen.(return 16))
 let g_of_seed seed =
   Nocrypto.Rng.(create ~seed:(Cstruct.of_string seed) (module Generators.Fortuna))
 
+let perm_3_of_5 = QCheck.(triple
+                           (int_range 0 4)
+                           (int_range 1 4)
+                           (int_range 2 4))
+
+let swap a idx1 idx2 =
+  let t = a.(idx1) in
+  a.(idx1) <- a.(idx2);
+  a.(idx2) <- t
+
 let share_suite = [
   QCheck.Test.make ~count:200 ~name:"share_3x5_unshare_all_identity"
     QCheck.(pair seed string)
@@ -75,6 +85,24 @@ let share_suite = [
        let g = g_of_seed seed in
        let shares = Share.share ~g s 3 5 in
        Share.unshare (Array.sub shares 2 3) = s);
+  QCheck.Test.make ~count:200 ~name:"share_3x5_unshare_3_random"
+    QCheck.(triple seed string perm_3_of_5)
+    (fun (seed, s, (idx1, idx2, idx3)) ->
+       let g = g_of_seed seed in
+       let shares = Share.share ~g s 3 5 in
+       swap shares 0 idx1;
+       swap shares 1 idx2;
+       swap shares 2 idx3;
+       let shares = Array.sub shares 0 3 in
+       Share.unshare shares = s);
+  QCheck.Test.make ~count:25 ~name:"share_random_params_unshare_all"
+    QCheck.(triple seed string (pair (int_range 1 255) (int_range 1 255)))
+    (fun (seed, s, (m, n)) ->
+       let g = g_of_seed seed in
+       let m = min m n
+       and n = max m n in
+       let shares = Share.share ~g s m n in
+       Share.unshare shares = s);
 ]
 
 
