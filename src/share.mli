@@ -1,9 +1,11 @@
 module type Field = sig
   type t
 
+  val size : int
   val zero : t
   val one : t
 
+  val of_int : int -> t
   val of_char : char -> t
   val to_char : t -> char
 
@@ -26,6 +28,9 @@ end
 (** Implementation of GF(2^8) *)
 module GF256: Field
 
+(** Pure RNG type. *)
+type ('a, 's) rng = 's -> ('a * 's)
+
 (** [share_byte secret threshold shares] splits a string [secret] into [shares]
  * shares where (at least) [threshold] shares are necessary to reconstruct
  * [secret]. *)
@@ -42,3 +47,10 @@ val share_byte : ?g:Nocrypto.Rng.g -> char -> int -> int -> (GF256.t * GF256.t) 
 
 (** Same as [unshare], but if you only want to reconstruct a one-byte secret *)
 val unshare_byte : (GF256.t * GF256.t) array -> char
+
+(** Construct a SecretShare module over an arbitrary field. *)
+module SecretShare (F: Field) : sig
+  val share : string -> int -> int -> (int -> (F.t array, 's) rng) -> ((F.t * string) array, 's) rng
+
+  val unshare : (F.t * string) array -> string
+end

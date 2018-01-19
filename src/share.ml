@@ -1,9 +1,11 @@
 module type Field = sig
   type t
 
+  val size : int
   val zero : t
   val one : t
 
+  val of_int : int -> t
   val of_char : char -> t
   val to_char : t -> char
 
@@ -47,15 +49,15 @@ module Polynomial(F: Field) = struct
 
   (* Generate coefficients a.(0), ..., a.(m-1) such that a.(0) is [secret], and
    * a.(1), ..., a.(m-1) are random. *)
-  let coefficients ?g secret threshold =
-    let a = Nocrypto.Rng.generate ?g (threshold - 1) in
+  let coefficients secret threshold rng s =
+    let elts, s = rng (threshold - 1) s in
     let a = Array.init threshold
         (fun i ->
            if i = 0
            then secret
-           else Cstruct.get_uint8 a (i-1)) in
+           else Array.get elts (i-1)) in
     assert (Array.length a = threshold);
-    a
+    a, s
 
   let l i u =
     let open F.Infix in
@@ -80,9 +82,13 @@ end
 module GF256: Field with type t = int = struct
   type t = int
 
+  let size = 256
+
   let zero = 0
 
   let one = 1
+
+  let of_int x = x
 
   let of_char = int_of_char
 
@@ -195,58 +201,96 @@ end
 
 module Poly_GF256 = Polynomial(GF256)
 
+type ('a, 's) rng = 's -> ('a * 's)
+
+(* Array.init but f is a state-transition not a function *)
+let array_s_init n f s =
+  if n = 0 then [||], s else
+    let a0, s0 = f 0 s in
+    let arr = Array.make n a0 in
+    let s' = ref s0 in
+    for i = 1 to n-1 do
+      let a, next_s = f i !s' in
+      Array.set arr i a;
+      s' := next_s
+    done;
+    arr, !s'
+
+module SecretShare (F: Field) = struct
+  module Poly = Polynomial(F)
+
+  let share_byte secret threshold shares rng s =
+    assert (shares < F.size);
+    assert (threshold <= shares);
+    assert (threshold > 0);
+    let secret = F.of_char secret in
+    (* Use 1,..., n as indices *)
+    let a, s = Poly.coefficients secret threshold rng s in
+    Array.init shares succ
+    |> Array.map F.of_int
+    (* For each index compute the polynomial and return the point *)
+    |> Array.map (fun x -> x, Poly.f a x), s
+
+  let share secret threshold shares rng s =
+    assert (shares < F.size);
+    assert (threshold <= shares);
+    assert (threshold > 0);
+    (* Use 1, ..., n as indices *)
+    let xs = Array.init shares succ in
+    (* Generate coefficients for a polynomial for each character in the secret. *)
+    let as_, s =
+      array_s_init (String.length secret) (fun i s ->
+          (* Compute the secrets for each index *)
+          Poly.coefficients (F.of_char secret.[i]) threshold rng s) s in
+    Array.map (fun x ->
+        let x = F.of_char (char_of_int x) in
+        x,
+        String.init (String.length secret)
+          (fun i -> F.to_char (Poly.f as_.(i) x )))
+      xs, s
+
+  let unshare_byte shares =
+    (* u is the indices *)
+    let u = Array.map fst shares
+    (* v is the shares *)
+    and v = Array.map snd shares in
+    Poly.interpolate u v |> F.to_char
+
+  let unshare shares =
+    (* u is the indices *)
+    let u = Array.map fst shares
+    (* v is the share strings *)
+    and v = Array.map snd shares in
+    (* Diagonalize the share string array so the resulting array consists of
+     * arrays that each consist of shares of the same character, i.e.
+     * vs.(j).(i) := v.(i).[j] for all i, j *)
+    let vs =
+      Array.init (String.length v.(0))
+        (fun i ->
+           Array.map (fun s -> F.of_char s.[i]) v) in
+    String.init (Array.length vs)
+      (fun i ->
+         (* Zip each one-byte share with its index *)
+         let zipped =
+           Array.init (Array.length u)
+             (fun j -> u.(j), vs.(i).(j)) in
+         unshare_byte zipped)
+end
+
+module SecretShare_GF256 = SecretShare(GF256)
+
+(* not actually pure but lets us reuse some code *)
+let nocrypto_rng ?g n () =
+  let chars = Nocrypto.Rng.generate ?g n in
+  Array.init n (fun i ->
+    Cstruct.get_uint8 chars i), ()
+
 let share_byte ?g secret threshold shares =
-  assert (shares <= 255);
-  assert (threshold <= shares);
-  assert (threshold > 0);
-  let secret = int_of_char secret in
-  (* Use 1,..., n as indices *)
-  let a = Poly_GF256.coefficients ?g secret threshold in
-  Array.init shares succ
-  (* For each index compute the polynomial and return the point *)
-  |> Array.map (fun x -> x, Poly_GF256.f a x)
+  SecretShare_GF256.share_byte secret threshold shares (nocrypto_rng ?g) () |> fst
 
 let share ?g secret threshold shares =
-  assert (shares <= 255);
-  assert (threshold <= shares);
-  assert (threshold > 0);
-  (* Use 1, ..., n as indices *)
-  let xs = Array.init shares succ in
-  (* Generate coefficients for a polynomial for each character in the secret. *)
-  let as_ =
-    Array.init (String.length secret)
-      (fun i ->
-  (* Compute the secrets for each index *)
-         Poly_GF256.coefficients ?g (GF256.of_char secret.[i]) threshold) in
-  Array.map (fun x ->
-      x,
-      String.init (String.length secret)
-        (fun i -> GF256.to_char (Poly_GF256.f as_.(i) x )))
-    xs
+  SecretShare_GF256.share secret threshold shares (nocrypto_rng ?g) () |> fst
 
-let unshare_byte shares =
-  (* u is the indices *)
-  let u = Array.map fst shares
-  (* v is the shares *)
-  and v = Array.map snd shares in
-  Poly_GF256.interpolate u v |> GF256.to_char
+let unshare_byte e = SecretShare_GF256.unshare_byte e
 
-let unshare shares =
-  (* u is the indices *)
-  let u = Array.map fst shares
-  (* v is the share strings *)
-  and v = Array.map snd shares in
-  (* Diagonalize the share string array so the resulting array consists of
-   * arrays that each consist of shares of the same character, i.e.
-   * vs.(j).(i) := v.(i).[j] for all i, j *)
-  let vs =
-    Array.init (String.length v.(0))
-      (fun i ->
-         Array.map (fun s -> GF256.of_char s.[i]) v) in
-  String.init (Array.length vs)
-    (fun i ->
-       (* Zip each one-byte share with its index *)
-       let zipped =
-         Array.init (Array.length u)
-           (fun j -> u.(j), vs.(i).(j)) in
-       unshare_byte zipped)
+let unshare e = SecretShare_GF256.unshare e
