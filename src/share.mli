@@ -6,8 +6,6 @@ module type Field = sig
   val one : t
 
   val of_int : int -> t
-  val of_char : char -> t
-  val to_char : t -> char
 
   val add : t -> t -> t
   val sub : t -> t -> t
@@ -26,7 +24,13 @@ module type Field = sig
 end
 
 (** Implementation of GF(2^8) *)
-module GF256: Field
+module GF256: sig
+  include Field with type t = int
+  val of_char : char -> t
+  val to_char : t -> char
+  val of_string : string -> t array
+  val to_string : t array -> string
+end
 
 (** Pure RNG type. *)
 type ('a, 's) rng = 's -> ('a * 's)
@@ -50,7 +54,11 @@ val unshare_byte : (GF256.t * GF256.t) array -> char
 
 (** Construct a SecretShare module over an arbitrary field. *)
 module SecretShare (F: Field) : sig
-  val share : string -> int -> int -> (int -> (F.t array, 's) rng) -> ((F.t * string) array, 's) rng
+  val share : F.t -> int -> int -> (int -> (F.t array, 's) rng) -> ((F.t * F.t) array, 's) rng
 
-  val unshare : (F.t * string) array -> string
+  val unshare : (F.t * F.t) array -> F.t
+
+  val share_array : F.t array -> int -> int -> (int -> (F.t array, 's) rng) -> ((F.t * F.t array) array, 's) rng
+
+  val unshare_array : (F.t * F.t array) array -> F.t array
 end
