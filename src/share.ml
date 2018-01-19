@@ -39,7 +39,7 @@ module Polynomial(F: Field) = struct
       F.one
       a
 
-  let f (a : F.t array) (x : F.t) =
+  let eval (a : F.t array) (x : F.t) =
     (* compute a.(0) + x * (a.(1) + x * (... + x * (a.(m)) ...)) *)
     let rec loop i a x acc =
       let open F in
@@ -60,21 +60,21 @@ module Polynomial(F: Field) = struct
     assert (Array.length a = threshold);
     a, s
 
-  let l i u =
+  let lagrange_basis i u x =
     let open F.Infix in
     Array.mapi
       (fun j u_j ->
          if i = j
          then F.one
-         else u_j / (u_j + u.(i)))
+         else (u_j - x) / (u_j + u.(i)))
       u
     |> product
 
-  let interpolate u v =
+  let interpolate u v x =
     let open F.Infix in
     Array.mapi
       (fun i v_i ->
-         l i u * v_i)
+         lagrange_basis i u x * v_i)
       v
     |> sum
 end
@@ -228,14 +228,14 @@ module SecretShare (F: Field) = struct
     Array.init shares succ
     |> Array.map F.of_int
     (* For each index compute the polynomial and return the point *)
-    |> Array.map (fun x -> x, Poly.f a x), s
+    |> Array.map (fun x -> x, Poly.eval a x), s
 
   let unshare shares =
     (* u is the indices *)
     let u = Array.map fst shares
     (* v is the shares *)
     and v = Array.map snd shares in
-    Poly.interpolate u v
+    Poly.interpolate u v F.zero
 
   let share_array secret threshold shares rng s =
     assert (shares < F.size);
@@ -252,7 +252,7 @@ module SecretShare (F: Field) = struct
         let x = F.of_int x in
         x,
         Array.init (Array.length secret)
-          (fun i -> Poly.f as_.(i) x))
+          (fun i -> Poly.eval as_.(i) x))
       xs, s
 
   let unshare_array shares =
