@@ -27,7 +27,20 @@ module type Field = sig
   end
 end
 
-module Polynomial(F: Field) = struct
+module type DHField = sig
+  include Field
+  type g
+
+  val zero_g : g
+  val one_g : g
+  val publish : t -> g
+  (* publish one == one_g *)
+  val mul_g : t -> g -> g
+  (* mul_g size one_g == one_g *)
+  val add_g : g -> g -> g
+end
+
+module Polynomial (F: Field) = struct
   let sum a =
     Array.fold_left
       F.add
@@ -80,6 +93,24 @@ module Polynomial(F: Field) = struct
     |> sum
 end
 
+module DHPolynomial (F: DHField) = struct
+  include Polynomial (F)
+  let sum_g a =
+    Array.fold_left
+      F.add_g
+      F.zero_g
+      a
+
+  let eval_g a x = eval a x |> F.publish
+
+  let interpolate_g u v x =
+    Array.mapi
+      (fun i v_i ->
+         F.mul_g (lagrange_basis i u x) v_i)
+      v
+    |> sum_g
+end
+
 (* See https://tools.ietf.org/html/draft-mcgrew-tss-03 *)
 module GF256 = struct
   type t = int
@@ -89,7 +120,6 @@ module GF256 = struct
   let one = 1
 
   let of_int x = x
-
   let of_char = int_of_char
   let to_char = char_of_int
   let of_string s = Array.init (String.length s) (int_of_char % String.get s)
@@ -200,8 +230,6 @@ module GF256 = struct
   end
 end
 
-module Poly_GF256 = Polynomial(GF256)
-
 type ('a, 's) rng = 's -> ('a * 's)
 
 (* Array.init but f is a state-transition not a function *)
@@ -223,10 +251,18 @@ let array_transpose v =
     (fun i ->
        Array.map (fun s -> s.(i)) v)
 
-module SecretShare (F: Field) = struct
-  module Poly = Polynomial(F)
-  type shares = (F.t * F.t) array
-  type array_shares = (F.t * F.t array) array
+module GenericShare (Poly: sig
+    module F: Field
+    type g
+    val coefficients : F.t -> int -> (int -> (F.t array, 's) rng) -> (F.t array, 's) rng
+    val eval : F.t array -> F.t -> g
+    val interpolate : F.t array -> g array -> F.t -> g
+  end) = struct
+  open Poly
+  type t = F.t
+  type g = Poly.g
+  type shares = (t * g) array
+  type array_shares = (t * g array) array
 
   let share secret threshold shares rng s =
     assert (shares < F.size);
@@ -310,7 +346,44 @@ module SecretShare (F: Field) = struct
     extend_array xs shares, s
 end
 
-module SecretShare_GF256 = SecretShare(GF256)
+module type Share = sig
+  type t (* master secret / share index *)
+  type g (* share / recovered secret *)
+  type shares = (t * g) array
+  type array_shares = (t * g array) array
+
+  val share : t -> int -> int -> (int -> (t array, 's) rng) -> (shares, 's) rng
+  val unshare : shares -> g
+  val extend : t array -> shares -> shares
+  val extend' : int -> shares -> (int -> (t array, 's) rng) -> (shares, 's) rng
+
+  val share_array : t array -> int -> int -> (int -> (t array, 's) rng) -> (array_shares, 's) rng
+  val unshare_array : array_shares -> g array
+  val extend_array : t array -> array_shares -> array_shares
+  val extend_array' : int -> array_shares -> (int -> (t array, 's) rng) -> (array_shares, 's) rng
+end
+
+module SecretShare (F: Field) = struct
+  include GenericShare (struct
+      include Polynomial (F)
+      module F = F
+      type g = F.t
+    end)
+end
+
+module PublicShare (F: DHField) = struct
+  include GenericShare (struct
+      include DHPolynomial (F)
+      module F = F
+      type g = F.g
+      let eval a x = eval_g a x
+      let interpolate u v x = interpolate_g u v x
+    end)
+
+  module Secret = SecretShare (F)
+end
+
+module SecretShare_GF256 = SecretShare (GF256)
 
 (* not actually pure but lets us reuse some code *)
 let nocrypto_rng ?g n () =
