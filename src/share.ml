@@ -80,7 +80,7 @@ module Polynomial (F: Field) = struct
       (fun j u_j ->
          if i = j
          then F.one
-         else (u_j - x) / (u_j + u.(i)))
+         else (u_j - x) / (u_j - u.(i)))
       u
     |> product
 
