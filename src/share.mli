@@ -1,10 +1,10 @@
 module type Field = sig
   type t
 
-  val size : int
   val zero : t
   val one : t
 
+  (** Must raise Invalid_argument if the input is out of bounds. *)
   val of_int : int -> t
 
   val add : t -> t -> t

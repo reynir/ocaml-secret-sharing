@@ -1,11 +1,11 @@
 let (%) f g x = f (g x)
 let second f (x, y) = (x, f y)
 let pair x y = x, y
+let check_arg b msg = if not b then invalid_arg msg else ()
 
 module type Field = sig
   type t
 
-  val size : int
   val zero : t
   val one : t
 
@@ -115,11 +115,10 @@ end
 module GF256 = struct
   type t = int
 
-  let size = 256
   let zero = 0
   let one = 1
 
-  let of_int x = x
+  let of_int x = check_arg (0 <= x && x < 256) "GF256.of_int: need 0 <= x < 256"; x
   let of_char = int_of_char
   let to_char = char_of_int
   let of_string s = Array.init (String.length s) (int_of_char % String.get s)
@@ -265,9 +264,8 @@ module GenericShare (Poly: sig
   type array_shares = (t * g array) array
 
   let share secret threshold shares rng s =
-    assert (shares < F.size);
-    assert (threshold <= shares);
-    assert (threshold > 0);
+    ignore (F.of_int shares);
+    check_arg (threshold <= shares) "GenericShare.share: need threshold <= shares";
     (* Use 1,..., n as indices *)
     let a, s = Poly.coefficients secret threshold rng s in
     Array.init shares succ
@@ -293,9 +291,8 @@ module GenericShare (Poly: sig
     extend xs shares, s
 
   let share_array secret threshold shares rng s =
-    assert (shares < F.size);
-    assert (threshold <= shares);
-    assert (threshold > 0);
+    ignore (F.of_int shares);
+    check_arg (threshold <= shares) "GenericShare.share_array: need threshold <= shares";
     (* Use 1, ..., n as indices *)
     let xs = Array.init shares succ in
     (* Generate coefficients for a polynomial for each character in the secret. *)
