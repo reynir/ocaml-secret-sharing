@@ -274,6 +274,7 @@ module GenericShare (Poly: sig
     |> Array.map (fun x -> x, Poly.eval a x), s
 
   let unshare shares =
+    ignore (F.of_int (Array.length shares));
     (* u is the indices *)
     let u = Array.map fst shares in
     (* v is the shares *)
@@ -281,6 +282,7 @@ module GenericShare (Poly: sig
     Poly.interpolate u v F.zero
 
   let extend xs shares =
+    ignore (F.of_int (Array.length shares));
     let u = Array.map fst shares in
     let v = Array.map snd shares in
     let ys = Array.map (Poly.interpolate u v) xs in
@@ -308,6 +310,7 @@ module GenericShare (Poly: sig
       xs, s
 
   let unshare_array shares =
+    ignore (F.of_int (Array.length shares));
     (* u is the indices *)
     let u = Array.map fst shares
     (* v is the share strings *)
@@ -325,6 +328,7 @@ module GenericShare (Poly: sig
          unshare zipped)
 
   let extend_array xs shares =
+    ignore (F.of_int (Array.length shares));
     let u = Array.map fst shares
     and v = Array.map snd shares in
     let vs = array_transpose v in
