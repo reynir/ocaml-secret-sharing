@@ -265,7 +265,7 @@ module GenericShare (Poly: sig
   type array_shares = (t * g array) array
 
   let share secret threshold shares rng s =
-    assert (shares < (try F.size |> Z.to_int with Z.Overflow -> max_int));
+    assert Z.(of_int shares < F.size);
     assert (threshold <= shares);
     assert (threshold > 0);
     (* Use 1,..., n as indices *)
@@ -293,7 +293,7 @@ module GenericShare (Poly: sig
     extend xs shares, s
 
   let share_array secret threshold shares rng s =
-    assert (shares < (try F.size |> Z.to_int with Z.Overflow -> max_int));
+    assert Z.(of_int shares < F.size);
     assert (threshold <= shares);
     assert (threshold > 0);
     (* Use 1, ..., n as indices *)
