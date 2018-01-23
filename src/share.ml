@@ -119,7 +119,7 @@ module GF256 = struct
   let zero = 0
   let one = 1
 
-  let of_int x = x
+  let of_int x = x & 0xff
   let of_char = int_of_char
   let to_char = char_of_int
   let of_string s = Array.init (String.length s) (int_of_char % String.get s)
