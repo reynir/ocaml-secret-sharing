@@ -9,7 +9,7 @@ module type Field = sig
   val zero : t
   val one : t
 
-  val of_int : int -> t
+  val of_int : int -> t option
 
   val add : t -> t -> t
   val sub : t -> t -> t
@@ -119,7 +119,9 @@ module GF256 = struct
   let zero = 0
   let one = 1
 
-  let of_int x = x
+  let of_int x = if x >= 0 && x < 256
+    then Some x
+    else None
   let of_char = int_of_char
   let to_char = char_of_int
   let of_string s = Array.init (String.length s) (int_of_char % String.get s)
@@ -271,7 +273,7 @@ module GenericShare (Poly: sig
     (* Use 1,..., n as indices *)
     let a, s = Poly.coefficients secret threshold rng s in
     Array.init shares succ
-    |> Array.map F.of_int
+    |> Array.map (fun x -> match F.of_int x with Some x -> x | None -> assert false)
     (* For each index compute the polynomial and return the point *)
     |> Array.map (fun x -> x, Poly.eval a x), s
 
@@ -304,10 +306,12 @@ module GenericShare (Poly: sig
           (* Compute the secrets for each index *)
           Poly.coefficients secret.(i) threshold rng s) s in
     Array.map (fun x ->
-        let x = F.of_int x in
-        x,
-        Array.init (Array.length secret)
-          (fun i -> Poly.eval as_.(i) x))
+        match F.of_int x with
+        | None -> assert false
+        | Some x ->
+          x,
+          Array.init (Array.length secret)
+            (fun i -> Poly.eval as_.(i) x))
       xs, s
 
   let unshare_array shares =

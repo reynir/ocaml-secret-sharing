@@ -5,7 +5,7 @@ module type Field = sig
   val zero : t
   val one : t
 
-  val of_int : int -> t
+  val of_int : int -> t option
 
   val add : t -> t -> t
   val sub : t -> t -> t
