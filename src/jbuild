@@ -3,4 +3,4 @@
 (library
   ((name share)
    (public_name secret-sharing)
-   (libraries (nocrypto))))
+   (libraries (nocrypto zarith))))
