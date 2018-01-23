@@ -5,7 +5,7 @@ let pair x y = x, y
 module type Field = sig
   type t
 
-  val size : int
+  val size : Z.t
   val zero : t
   val one : t
 
@@ -115,7 +115,7 @@ end
 module GF256 = struct
   type t = int
 
-  let size = 256
+  let size = Z.of_int 256
   let zero = 0
   let one = 1
 
@@ -265,7 +265,7 @@ module GenericShare (Poly: sig
   type array_shares = (t * g array) array
 
   let share secret threshold shares rng s =
-    assert (shares < F.size);
+    assert (shares < (try F.size |> Z.to_int with Z.Overflow -> max_int));
     assert (threshold <= shares);
     assert (threshold > 0);
     (* Use 1,..., n as indices *)
@@ -293,7 +293,7 @@ module GenericShare (Poly: sig
     extend xs shares, s
 
   let share_array secret threshold shares rng s =
-    assert (shares < F.size);
+    assert (shares < (try F.size |> Z.to_int with Z.Overflow -> max_int));
     assert (threshold <= shares);
     assert (threshold > 0);
     (* Use 1, ..., n as indices *)

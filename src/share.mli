@@ -1,7 +1,7 @@
 module type Field = sig
   type t
 
-  val size : int
+  val size : Z.t
   val zero : t
   val one : t
 
