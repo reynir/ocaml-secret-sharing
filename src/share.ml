@@ -203,7 +203,7 @@ module GF256 = struct
 
   let log x =
     if x = 0
-    then raise (Invalid_argument "zero divisor")
+    then raise Division_by_zero
     else log_table.(x)
 
   let exp x =
@@ -216,7 +216,7 @@ module GF256 = struct
 
   let div x y =
     if y = 0
-    then raise (Invalid_argument "zero divisor")
+    then raise Division_by_zero
     else if x = 0
     then 0
     else exp ((255 + log x - log y) mod 255)
