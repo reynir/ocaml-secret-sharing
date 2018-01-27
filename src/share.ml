@@ -266,6 +266,7 @@ module GenericShare (Poly: sig
   let share secret threshold shares rng s =
     ignore (F.of_int shares);
     check_arg (threshold <= shares) "GenericShare.share: need threshold <= shares";
+    check_arg (threshold > 0) "GenericShare.share: need threshold > 0";
     (* Use 1,..., n as indices *)
     let a, s = Poly.coefficients secret threshold rng s in
     Array.init shares succ
@@ -295,6 +296,7 @@ module GenericShare (Poly: sig
   let share_array secret threshold shares rng s =
     ignore (F.of_int shares);
     check_arg (threshold <= shares) "GenericShare.share_array: need threshold <= shares";
+    check_arg (threshold > 0) "GenericShare.share: need threshold > 0";
     (* Use 1, ..., n as indices *)
     let xs = Array.init shares succ in
     (* Generate coefficients for a polynomial for each character in the secret. *)
