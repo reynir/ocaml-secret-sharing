@@ -272,6 +272,7 @@ module GenericShare (Poly: sig
     |> Array.map (fun x -> x, Poly.eval a x), s
 
   let share secret threshold shares rng s =
+    (* [F.of_int] will throw Invalid_argument if [shares] is too big *)
     ignore (F.of_int shares);
     check_arg (threshold <= shares) "GenericShare.share: need threshold <= shares";
     check_arg (threshold > 0) "GenericShare.share: need threshold > 0";
@@ -413,6 +414,7 @@ let nocrypto_rng ?g n () =
   Array.init n (Cstruct.get_uint8 chars), ()
 
 let share ?g secret threshold shares =
+  (* The tss draft says max length for the secret is 2^{16}-2 *)
   check_arg (String.length secret < ((1 lsl 16) - 2))
     "SecretShare_GF256.share: secret longer than 2^16-2";
   SecretShare_GF256.share_array (GF256.of_string secret) threshold shares
