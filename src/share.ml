@@ -263,10 +263,7 @@ module GenericShare (Poly: sig
   type shares = (t * g) array
   type array_shares = (t * g array) array
 
-  let share secret threshold shares rng s =
-    ignore (F.of_int shares);
-    check_arg (threshold <= shares) "GenericShare.share: need threshold <= shares";
-    check_arg (threshold > 0) "GenericShare.share: need threshold > 0";
+  let unsafe_share secret threshold shares rng s =
     (* Use 1,..., n as indices *)
     let a, s = Poly.coefficients secret threshold rng s in
     Array.init shares succ
@@ -274,13 +271,35 @@ module GenericShare (Poly: sig
     (* For each index compute the polynomial and return the point *)
     |> Array.map (fun x -> x, Poly.eval a x), s
 
-  let unshare shares =
-    ignore (F.of_int (Array.length shares));
+  let share secret threshold shares rng s =
+    ignore (F.of_int shares);
+    check_arg (threshold <= shares) "GenericShare.share: need threshold <= shares";
+    check_arg (threshold > 0) "GenericShare.share: need threshold > 0";
+    unsafe_share secret threshold shares rng s
+
+
+  let unsafe_unshare shares =
     (* u is the indices *)
     let u = Array.map fst shares in
     (* v is the shares *)
     let v = Array.map snd shares in
     Poly.interpolate u v F.zero
+
+  let unshare shares =
+    ignore (F.of_int (Array.length shares));
+    let () =
+      let exception Duplicate in
+      let module IndexSet = Set.Make(struct type t = F.t let compare = compare end) in
+      try Array.fold_left
+            (fun indices index ->
+               if IndexSet.mem index indices
+               then raise Duplicate;
+               IndexSet.add index indices)
+            IndexSet.empty
+            (Array.map fst shares)
+        |> ignore
+      with Duplicate -> check_arg false "GenericShare.unshare: duplicate index"
+    in unsafe_unshare shares
 
   let extend xs shares =
     ignore (F.of_int (Array.length shares));
@@ -394,6 +413,8 @@ let nocrypto_rng ?g n () =
   Array.init n (Cstruct.get_uint8 chars), ()
 
 let share ?g secret threshold shares =
+  check_arg (String.length secret < ((1 lsl 16) - 2))
+    "SecretShare_GF256.share: secret longer than 2^16-2";
   SecretShare_GF256.share_array (GF256.of_string secret) threshold shares
     (nocrypto_rng ?g) () |> fst
   |> Array.map (second GF256.to_string)
