@@ -116,16 +116,9 @@ end
 let gf2np coeffs =
   let open List in
   let pow = hd coeffs in
-  let g = Array.make Pervasives.(pow + 1) 0 in
-  iter (fun i -> Array.set g i 1) (0 :: coeffs);
-  let px =
-    Array.to_list g |>
-    map string_of_int |>
-    rev |>
-    String.concat "" in
-  (* print_endline @@ (string_of_int deg) ^ ":" ^ px; *)
-  let p = px |>
-    Z.of_string_base 2 in
+  let p =
+    List.map (Z.shift_left Z.one) coeffs
+    |> List.fold_left Z.(lor) Z.zero in
   (module struct let power = pow let irred_poly = p end: GF2NP)
 
 (*
