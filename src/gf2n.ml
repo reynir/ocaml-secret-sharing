@@ -117,7 +117,7 @@ let gf2np coeffs =
   let open List in
   let pow = hd coeffs in
   let p =
-    List.map (Z.shift_left Z.one) coeffs
+    List.map (Z.shift_left Z.one) (0 :: coeffs)
     |> List.fold_left Z.(lor) Z.zero in
   (module struct let power = pow let irred_poly = p end: GF2NP)
 
