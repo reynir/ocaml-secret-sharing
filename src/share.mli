@@ -1,27 +1,4 @@
-module type Field = sig
-  type t
-
-  val zero : t
-  val one : t
-
-  (** Must raise Invalid_argument if the input is out of bounds. *)
-  val of_int : int -> t
-
-  val add : t -> t -> t
-  val sub : t -> t -> t
-  val mul : t -> t -> t
-  val div : t -> t -> t
-
-  val exp : t -> t
-  val log : t -> t
-
-  module Infix: sig
-    val ( + ) : t -> t -> t
-    val ( - ) : t -> t -> t
-    val ( * ) : t -> t -> t
-    val ( / ) : t -> t -> t
-  end
-end
+open Gf2n
 
 module type DHField = sig
   include Field
@@ -34,15 +11,6 @@ module type DHField = sig
   val mul_g : t -> g -> g
   (* mul_g size one_g == one_g *)
   val add_g : g -> g -> g
-end
-
-(** Implementation of GF(2^8) *)
-module GF256: sig
-  include Field with type t = int
-  val of_char : char -> t
-  val to_char : t -> char
-  val of_string : string -> t array
-  val to_string : t array -> string
 end
 
 (** Pure RNG type. *)
@@ -81,12 +49,12 @@ module type Share = sig
   val share : t -> int -> int -> (int -> (t array, 's) rng) -> (shares, 's) rng
   val unshare : shares -> g
   val extend : t array -> shares -> shares
-  val extend' : int -> shares -> (int -> (t array, 's) rng) -> (shares, 's) rng
+  val extend' : int -> shares -> (int -> t array -> (t array, 's) rng) -> (shares, 's) rng
 
   val share_array : t array -> int -> int -> (int -> (t array, 's) rng) -> (array_shares, 's) rng
   val unshare_array : array_shares -> g array
   val extend_array : t array -> array_shares -> array_shares
-  val extend_array' : int -> array_shares -> (int -> (t array, 's) rng) -> (array_shares, 's) rng
+  val extend_array' : int -> array_shares -> (int -> t array -> (t array, 's) rng) -> (array_shares, 's) rng
 end
 
 (** Construct a SecretShare module over an arbitrary field. *)
@@ -115,3 +83,15 @@ module PublicShare (F: DHField): sig
   include Share with type t = F.t and type g = F.g
   module Secret: Share with type t = F.t and type g = F.t
 end
+
+(** Create an RNG generating several unique elements not matching an initial set,
+    from an RNG generating a single element. *)
+val uniq_rng_of: ('a, 's) rng -> int -> 'a array -> ('a array, 's) rng
+
+(** Create an RNG generating several elements,
+    from an RNG generating a single element. *)
+val array_rng_of: ('a, 's) rng -> int -> ('a array, 's) rng
+
+(** Create an RNG generating a single element of GF2^n,
+    where n is the first argument. *)
+val nocrypto_rng_gf2n: ?g:Nocrypto.Rng.g -> int -> (Z.t, unit) rng

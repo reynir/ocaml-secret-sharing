@@ -1,6 +1,6 @@
 (jbuild_version 1)
 
 (library
-  ((name share)
+  ((name secret_sharing)
    (public_name secret-sharing)
    (libraries (nocrypto))))
